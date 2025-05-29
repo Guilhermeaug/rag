@@ -1,0 +1,30 @@
+[project]
+name = "rag-backend"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.11"
+dependencies = [
+    "docx2txt>=0.9",
+    "faiss-cpu>=1.11.0",
+    "fastapi>=0.115.12",
+    "langchain>=0.3.25",
+    "langchain-community>=0.3.24",
+    "langchain-google-genai>=2.1.4",
+    "langchain-huggingface>=0.2.0",
+    "langchain-ollama>=0.3.3",
+    "langchain-openai>=0.3.17",
+    "markdown>=3.8",
+    "pandas>=2.2.3",
+    "pdf2image>=1.17.0",
+    "pdfminer-six>=20250506",
+    "pi-heif>=0.22.0",
+    "python-docx>=1.1.2",
+    "python-dotenv>=1.1.0",
+    "torch>=2.7.0",
+    "unstructured>=0.17.2",
+    "unstructured-inference>=1.0.2",
+    "unstructured-pytesseract>=0.3.15",
+    "uvicorn>=0.34.2",
+    "xlrd>=2.0.1",
+]
+
