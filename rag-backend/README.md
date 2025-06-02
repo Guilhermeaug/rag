@@ -41,6 +41,8 @@ cd rag-public-services/rag-backend
 2. Instale as dependências com UV:
 ```
 uv pip install -e .
+
+uv sync
 ```
 
 3. Configure as variáveis de ambiente (crie um arquivo `.env` na raiz do projeto):
@@ -55,6 +57,8 @@ GOOGLE_API_KEY=sua_chave_do_google
 
 ```
 python main.py
+
+uv run main.py
 ```
 
 Isso iniciará o servidor FastAPI na porta 8000.
