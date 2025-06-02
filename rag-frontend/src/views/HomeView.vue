@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick, watch } from 'vue';
+import { marked } from 'marked'; // Importa o 'marked'
+import DOMPurify from 'dompurify'; // Importa o DOMPurify
 
 interface Message {
   id: number;
@@ -13,6 +15,23 @@ const newMessage = ref('');
 let messageIdCounter = 0;
 const messagesAreaRef = ref<HTMLElement | null>(null);
 const isLoading = ref(false); // Novo estado para controlar o carregamento
+
+// Configurar 'marked' (opcional, mas recomendado para GFM e quebras de linha)
+marked.setOptions({
+  gfm: true, // Habilita GitHub Flavored Markdown (GFM)
+  breaks: true, // Converte quebras de linha GFM (um único Enter) em <br>
+  // A opção 'sanitize' foi removida do marked. Usaremos DOMPurify.
+});
+
+// Função para renderizar Markdown para HTML seguro
+const renderMarkdown = (markdownText: string) => {
+  if (!markdownText) return '';
+  // 1. Converte Markdown para HTML usando marked
+  const rawHtml = marked.parse(markdownText) as string;
+  // 2. Sanitiza o HTML gerado para prevenir XSS
+  const cleanHtml = DOMPurify.sanitize(rawHtml);
+  return cleanHtml;
+};
 
 const scrollToBottom = () => {
   nextTick(() => {
@@ -130,6 +149,7 @@ const sendMessage = async () => {
           <p>Comece uma conversa!</p>
           <span>Envie sua primeira mensagem abaixo.</span>
         </div>
+
         <div
           v-for="message in messages"
           :key="message.id"
@@ -137,7 +157,13 @@ const sendMessage = async () => {
           :class="{ 'user': message.sender === 'user', 'llm': message.sender === 'llm' }"
         >
           <div class="message-bubble" :class="{'thinking': message.text === 'LLM está processando sua pergunta...', 'error': message.sender === 'llm' && message.text.startsWith('Erro:')}">
-            <p class="message-text">{{ message.text }}</p>
+            
+            <div 
+              v-if="message.sender === 'llm' && message.text !== 'LLM está processando sua pergunta...' && !message.text.startsWith('Erro:')" 
+              class="message-text markdown-content" 
+              v-html="renderMarkdown(message.text)">
+            </div>
+            <p v-else class="message-text">{{ message.text }}</p>
             <span v-if="message.text !== 'LLM está processando sua pergunta...'" class="timestamp">
               {{ message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
             </span>
@@ -157,7 +183,8 @@ const sendMessage = async () => {
           />
           <button type="submit" class="send-button" aria-label="Enviar mensagem" :disabled="isLoading">
             <svg v-if="!isLoading" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-            <div v-else class="spinner"></div> </button>
+            <div v-else class="spinner"></div>
+          </button>
         </form>
       </footer>
     </main>
