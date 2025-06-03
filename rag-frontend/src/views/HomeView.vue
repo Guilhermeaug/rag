@@ -202,9 +202,9 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
           <div class="setting-item">
             <label for="search-type-select">Tipo de Busca:</label>
             <select id="search-type-select" v-model="selectedSearchType" class="settings-select">
-              <option value="similarity">Similaridade</option>
+              <option value="similarity">Similarity</option>
               <option value="mmr">MMR (Maximal Marginal Relevance)</option>
-              <!-- Adicione outros tipos de busca suportados pelo seu backend -->
+              <option value="similarity_score_threshold">Similarity Score Threshold</option>
             </select>
           </div>
           <div class="setting-item">
@@ -407,7 +407,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   border: 1px solid var(--input-border-color);
   border-radius: var(--border-radius-medium);
   font-size: 0.9rem;
-  background-color: var(--chat-background-color);
+  background-color: black;
   color: var(--text-primary);
   outline: none;
   transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
@@ -658,7 +658,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   padding: 8px 14px; 
   font-size: 0.875rem; 
   font-weight: 500;
-  color: var(--button-secondary-color); 
+  stroke: white; 
   background-color: var(--chat-background-color);
   border: 1px solid var(--input-border-color); 
   border-radius: var(--border-radius-medium);
@@ -668,7 +668,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
 }
 
 .file-upload-label:hover:not(.disabled) {
-  background-color: #e9ecef; 
+  background-color: #55585a; 
   border-color: #adb5bd;
   color: var(--text-primary);
 }
