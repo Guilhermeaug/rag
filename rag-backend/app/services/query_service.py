@@ -37,7 +37,7 @@ class QueryService:
             # Configurações padrão para o retriever, ajuste conforme necessário
             retriever = vectorstore.as_retriever(
                 search_type=search_type, # Usa o search_type recebido
-                search_kwargs={"k": search_k} # Usa o search_k recebido
+                search_kwargs={"k": search_k, "score_threshold": 0.5} # Usa o search_k recebido
             )
             logger.info("Vectorstore e retriever carregados com sucesso.")
             return vectorstore, retriever

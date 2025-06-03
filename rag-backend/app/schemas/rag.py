@@ -8,7 +8,7 @@ class QueryRequest(BaseModel):
     temperature: Optional[float] = Field(default=0.7, description="Temperatura para geração de texto (0.0 a 1.0)")
     max_tokens: Optional[int] = Field(default=4096, description="Número máximo de tokens na resposta")
 
-    search_type: Optional[Literal['similarity', 'mmr']] = Field(default='similarity', description="Tipo de busca para o retriever")
+    search_type: Optional[Literal['similarity', 'mmr', 'similarity_score_threshold']] = Field(default='similarity', description="Tipo de busca para o retriever")
     search_k: Optional[int] = Field(default=5, ge=1, le=20, description="Número de documentos a serem recuperados (k)")
 
 class IngestRequest(BaseModel):

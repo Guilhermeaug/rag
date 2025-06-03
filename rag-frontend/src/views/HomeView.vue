@@ -23,6 +23,7 @@ const fileNameDisplay = ref<string>('');
 // --- NOVOS PARÂMETROS PARA CONFIGURAÇÃO DO RAG ---
 const selectedSearchType = ref<'similarity' | 'mmr'>('similarity'); // Tipos de busca comuns
 const searchK = ref<number>(5); // Valor padrão para 'k'
+const searchScoreThreshold = ref<number>(0.5);
 
 // Configura 'marked'
 marked.setOptions({
@@ -75,11 +76,13 @@ const sendMessage = async () => {
   try {
     const backendUrl = 'http://localhost:8000/query';
     // Inclui os novos parâmetros do RAG no corpo da requisição
-    const requestBody = {
+    const requestBody: any = { 
       query: userText,
       search_type: selectedSearchType.value,
       search_k: searchK.value,
     };
+
+    console.log('Enviando para o backend:', JSON.stringify(requestBody, null, 2));
 
     const response = await fetch(backendUrl, {
       method: 'POST',
@@ -93,11 +96,46 @@ const sendMessage = async () => {
     }
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: `Erro HTTP: ${response.status} ${response.statusText}` }));
-      throw new Error(errorData.detail || `Erro ao contatar o backend: ${response.status}`);
+      let errorDetailMessage = `Erro HTTP: ${response.status} ${response.statusText}`; // Mensagem padrão
+      let errorData;
+      try {
+        // Lê o corpo da resposta como texto UMA ÚNICA VEZ
+        const responseBodyText = await response.text();
+        console.log('Corpo da resposta de erro (texto):', responseBodyText);
+
+        if (responseBodyText) {
+          // Tenta parsear o texto como JSON
+          errorData = JSON.parse(responseBodyText);
+          console.error('Detalhes do erro do backend (parseado do texto):', errorData);
+
+          if (errorData && errorData.detail) {
+            if (Array.isArray(errorData.detail)) {
+              errorDetailMessage = errorData.detail.map((err: any) => {
+                const loc = err.loc ? err.loc.join('.') : 'local_desconhecido';
+                const msg = err.msg || 'erro_desconhecido';
+                const type = err.type || 'tipo_desconhecido';
+                return `${loc} - ${msg} (tipo: ${type})`;
+              }).join('; ');
+            } else if (typeof errorData.detail === 'string') {
+              errorDetailMessage = errorData.detail;
+            } else {
+              errorDetailMessage = JSON.stringify(errorData.detail);
+            }
+          } else if (errorData) {
+            // Se não houver 'detail', mas obtivemos algum JSON, stringifique o objeto todo
+            errorDetailMessage = JSON.stringify(errorData);
+          }
+        }
+        // Se responseBodyText estiver vazio, errorDetailMessage permanece a mensagem HTTP padrão.
+      } catch (parseOrReadError) {
+        // Se a leitura do texto ou o parsing do JSON falhar
+        console.error('Falha ao ler/parsear corpo da resposta de erro:', parseOrReadError);
+        // errorDetailMessage já tem o status HTTP como fallback.
+      }
+      throw new Error(errorDetailMessage);
     }
 
-    const data = await response.json();
+    const data = await response.json(); // Se response.ok, o corpo ainda não foi lido
     const llmResponseText = data.answer || "Não foi possível obter uma resposta.";
 
     messages.value.push({
@@ -108,7 +146,7 @@ const sendMessage = async () => {
     });
 
   } catch (error) {
-    console.error('Erro ao enviar mensagem:', error);
+    console.error('Erro ao enviar mensagem (capturado no catch principal):', error);
     const thinkingIndex = messages.value.findIndex(m => m.id === thinkingMessageId);
     if (thinkingIndex !== -1) {
       messages.value.splice(thinkingIndex, 1);
