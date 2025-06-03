@@ -19,13 +19,13 @@ logger = get_logger(__name__)
 
 class QueryService:
     @staticmethod
-    def load_vectorstore() -> Tuple[Any, Any]: # Defina Any para os tipos de vectorstore e retriever
+    def load_vectorstore(search_type: str = 'similarity', search_k: int = 5) -> Tuple[Any, Any]: # Defina Any para os tipos de vectorstore e retriever
         """
         Carrega (ou obtém) o vectorstore e o retriever do VectorstoreService.
         Este método deve ser chamado ANTES de qualquer tentativa de consulta.
         O vectorstore é esperado estar inicializado pelo IngestService.
         """
-        logger.info("Carregando vectorstore e retriever via VectorstoreService...")
+        logger.info(f"Carregando vectorstore e retriever via VectorstoreService com search_type='{search_type}', k={search_k}...")
         vectorstore = VectorstoreService.get_vectorstore() # Assumindo que VectorstoreService tem este método
 
         if not vectorstore:
@@ -36,8 +36,8 @@ class QueryService:
         try:
             # Configurações padrão para o retriever, ajuste conforme necessário
             retriever = vectorstore.as_retriever(
-                search_type="similarity",
-                search_kwargs={"k": 5} # Número de documentos a serem recuperados
+                search_type=search_type, # Usa o search_type recebido
+                search_kwargs={"k": search_k} # Usa o search_k recebido
             )
             logger.info("Vectorstore e retriever carregados com sucesso.")
             return vectorstore, retriever
@@ -104,19 +104,24 @@ class QueryService:
     @staticmethod
     async def process_query(
             query: str,
+            search_type: str = 'similarity',
+            search_k: int = 5,
             provider: LLMProvider = "openai", # Certifique-se que LLMProvider está definido
             model: str = "gpt-4o-mini",
             temperature: float = 0.7,
             max_tokens: int = 4096
     ) -> Dict[str, Any]:
         try:
-            logger.info(f"Processando consulta: '{query}' com modelo {provider}/{model}")
+            logger.info(f"Processando consulta: '{query}' com search_type='{search_type}', k={search_k}, modelo {provider}/{model}")
 
-            vectorstore_instance, retriever = QueryService.load_vectorstore()
+            vectorstore_instance, retriever = QueryService.load_vectorstore(
+                search_type=search_type, 
+                search_k=search_k
+            )
 
             # Logar documentos recuperados (MUITO ÚTIL PARA DEBUG)
             if retriever:
-                logger.info(f"Recuperando documentos relevantes para a query: '{query}'")
+                logger.info(f"Recuperando documentos relevantes para a query: '{query}' usando search_type='{search_type}', k={search_k}")
                 retrieved_docs = await retriever.aget_relevant_documents(query) # Use aget_ para async
                 logger.info(f"Número de documentos recuperados: {len(retrieved_docs)}")
                 for i, doc in enumerate(retrieved_docs):

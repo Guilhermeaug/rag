@@ -14,11 +14,15 @@ const messages = ref<Message[]>([]);
 const newMessage = ref('');
 let messageIdCounter = 0;
 const messagesAreaRef = ref<HTMLElement | null>(null);
-const isLoading = ref(false); // Para o chat
-const isUploading = ref(false); // Para o upload de arquivos
+const isLoading = ref(false);
+const isUploading = ref(false);
 const selectedFile = ref<File | null>(null);
 const uploadStatusMessage = ref('');
-const fileNameDisplay = ref('');
+const fileNameDisplay = ref<string>('');
+
+// --- NOVOS PARÂMETROS PARA CONFIGURAÇÃO DO RAG ---
+const selectedSearchType = ref<'similarity' | 'mmr'>('similarity'); // Tipos de busca comuns
+const searchK = ref<number>(5); // Valor padrão para 'k'
 
 // Configura 'marked'
 marked.setOptions({
@@ -70,7 +74,13 @@ const sendMessage = async () => {
 
   try {
     const backendUrl = 'http://localhost:8000/query';
-    const requestBody = { query: userText };
+    // Inclui os novos parâmetros do RAG no corpo da requisição
+    const requestBody = {
+      query: userText,
+      search_type: selectedSearchType.value,
+      search_k: searchK.value,
+    };
+
     const response = await fetch(backendUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -146,24 +156,23 @@ const uploadFile = async () => {
       method: 'POST',
       body: formData,
     });
-
     const responseData = await response.json();
 
     if (!response.ok) {
       if (response.status === 202 && responseData.status === "accepted") {
          uploadStatusMessage.value = `Sucesso: ${responseData.message}`;
       } else {
-        throw new Error(responseData.detail || `Erro no upload: ${response.status} ${response.statusText}`);
+        throw new Error(responseData.detail || `Erro no upload de ${selectedFile.value.name}: ${response.status}`);
       }
     } else if (responseData.status === "accepted") {
         uploadStatusMessage.value = `Sucesso: ${responseData.message}`;
     } else {
-        uploadStatusMessage.value = `Resposta inesperada: ${JSON.stringify(responseData)}`;
+        uploadStatusMessage.value = `Resposta inesperada para ${selectedFile.value.name}: ${JSON.stringify(responseData)}`;
     }
 
   } catch (error) {
-    console.error('Erro ao fazer upload do arquivo:', error);
-    uploadStatusMessage.value = `Erro: ${error instanceof Error ? error.message : 'Falha no upload.'}`;
+    console.error(`Erro ao fazer upload do arquivo ${selectedFile.value.name}:`, error);
+    uploadStatusMessage.value = `Erro ao enviar ${selectedFile.value.name}: ${error instanceof Error ? error.message : 'Falha no upload.'}`;
   } finally {
     isUploading.value = false;
     selectedFile.value = null; 
@@ -186,7 +195,27 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
         <h1>💬 Chat com RAG-LLM</h1>
       </header>
 
+      <!-- NOVA SEÇÃO DE CONFIGURAÇÕES DO RAG -->
+      <section class="rag-settings-section">
+        <h2>Configurações do Retriever</h2>
+        <div class="settings-grid">
+          <div class="setting-item">
+            <label for="search-type-select">Tipo de Busca:</label>
+            <select id="search-type-select" v-model="selectedSearchType" class="settings-select">
+              <option value="similarity">Similaridade</option>
+              <option value="mmr">MMR (Maximal Marginal Relevance)</option>
+              <!-- Adicione outros tipos de busca suportados pelo seu backend -->
+            </select>
+          </div>
+          <div class="setting-item">
+            <label for="search-k-input">Documentos (k):</label>
+            <input type="number" id="search-k-input" v-model.number="searchK" min="1" max="20" class="settings-input-number">
+          </div>
+        </div>
+      </section>
+
       <div class="messages-area" ref="messagesAreaRef">
+        <!-- ... (loop de mensagens) ... -->
         <div v-if="messages.length === 0 && !isLoading" class="no-messages-placeholder">
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather feather-message-square"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
           <p>Comece uma conversa!</p>
@@ -213,6 +242,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
       </div>
       
       <footer class="input-area">
+        <!-- ... (formulário de input do chat) ... -->
         <form @submit.prevent="sendMessage" class="input-form">
           <input
             type="text"
@@ -223,13 +253,14 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
             :disabled="isLoading"
           />
           <button type="submit" class="send-button" aria-label="Enviar mensagem" :disabled="isLoading">
-            <svg v-if="!isLoading" xmlns="http://www.w3.org/2000/svg" width="24" height="24" color="white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            <svg v-if="!isLoading" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
             <div v-else class="spinner"></div>
           </button>
         </form>
       </footer>
 
       <section class="upload-section">
+        <!-- ... (seção de upload de arquivo) ... -->
         <h2>Adicionar Documento ao RAG</h2>
         <div class="file-upload-container">
           <label for="file-upload-input" class="file-upload-label" :class="{'disabled': isUploading}">
@@ -250,9 +281,10 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
             <span v-else>Enviar</span>
           </button>
         </div>
-        <p v-if="uploadStatusMessage" class="upload-status" :class="{'success': uploadStatusMessage.startsWith('Sucesso:'), 'error-message': uploadStatusMessage.startsWith('Erro:')}">
+        <p v-if="uploadStatusMessage" class="upload-status" :class="{'success': uploadStatusMessage.includes('Sucesso'), 'error-message': uploadStatusMessage.includes('Erro:')}">
           {{ uploadStatusMessage }}
         </p>
+        <p class="upload-note">Nota: Após o envio, pode levar alguns instantes para que o conteúdo do documento seja totalmente processado e esteja disponível para consulta.</p>
       </section>
 
     </main>
@@ -260,36 +292,37 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
 </template>
 
 <style scoped>
+/* ... (Seus estilos :root e outros existentes) ... */
 :root {
   --font-family-sans-serif: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --page-background-color: #e9ebee; /* Cor de fundo da página um pouco mais escura */
+  --page-background-color: #e9ebee; 
   --chat-background-color: #ffffff;
-  --header-footer-background: #f8f9fa; /* Fundo para header, input e upload section */
+  --header-footer-background: #f8f9fa; 
   --text-primary: #212529;
   --text-secondary: #495057;
   --text-muted: #6c757d;
   
   --user-message-background: #007AFF;
   --user-message-text: #ffffff;
-  --llm-message-background: #f0f2f5; /* Fundo da mensagem LLM um pouco mais claro */
+  --llm-message-background: #f0f2f5; 
   --llm-message-text: #212529;
   --thinking-message-color: #495057;
   --error-message-background: #ffebee;
   --error-message-text: #c62828; 
   --success-message-text: #28a745; 
 
-  --input-border-color: #d1d7de; /* Borda do input um pouco mais suave */
+  --input-border-color: #d1d7de; 
   --input-focus-border-color: #86b7fe;
   --input-focus-box-shadow: 0 0 0 0.25rem rgba(0, 122, 255, 0.25);
 
   --button-primary-color: #007AFF;
   --button-primary-hover-color: #0056b3;
-  --button-secondary-color: #6c757d;
-  --button-secondary-hover-color: #545b62; /* Escurecido um pouco */
+  --button-secondary-color: #6c757d; 
+  --button-secondary-hover-color: #545b62; 
 
-  --border-radius-default: 12px; /* Reduzido para um visual mais contido */
+  --border-radius-default: 12px; 
   --border-radius-medium: 8px; 
-  --border-radius-bubble: 18px; /* Mantido para bolhas */
+  --border-radius-bubble: 18px; 
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
   --shadow-md: 0 4px 8px rgba(0,0,0,0.07);
 }
@@ -299,7 +332,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background-color: var(--page-background-color); /* Aplicando nova cor de fundo da página */
+  background-color: var(--page-background-color); 
   font-family: var(--font-family-sans-serif);
   padding: 20px;
   box-sizing: border-box;
@@ -309,17 +342,17 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   display: flex;
   flex-direction: column;
   height: calc(100vh - 40px); 
-  max-height: 850px; 
+  max-height: 900px; /* Aumentado para acomodar nova seção */
   width: 100%;
   max-width: 768px;
-  background-color: var(--chat-background-color); /* Fundo do chat */
+  background-color: var(--chat-background-color); 
   border-radius: var(--border-radius-default);
   box-shadow: var(--shadow-md);
   overflow: hidden; 
 }
 
 .chat-header {
-  padding: 16px 24px; /* Ajustado padding */
+  padding: 16px 24px; 
   background-color: var(--header-footer-background);
   border-bottom: 1px solid var(--input-border-color);
   text-align: center;
@@ -327,22 +360,79 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
 }
 
 .chat-header h1 {
-  font-size: 1.25rem; /* Ajustado */
+  font-size: 1.25rem; 
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
 }
 
+/* --- ESTILOS PARA A NOVA SEÇÃO DE CONFIGURAÇÕES DO RAG --- */
+.rag-settings-section {
+  padding: 16px 20px;
+  background-color: var(--header-footer-background);
+  border-bottom: 1px solid var(--input-border-color);
+  flex-shrink: 0;
+}
+
+.rag-settings-section h2 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-top: 0;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Layout responsivo */
+  gap: 16px;
+}
+
+.setting-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.setting-item label {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.settings-select,
+.settings-input-number {
+  padding: 8px 12px;
+  border: 1px solid var(--input-border-color);
+  border-radius: var(--border-radius-medium);
+  font-size: 0.9rem;
+  background-color: var(--chat-background-color);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
+}
+.settings-select:focus,
+.settings-input-number:focus {
+  border-color: var(--input-focus-border-color);
+  box-shadow: var(--input-focus-box-shadow);
+}
+.settings-input-number {
+  width: 80px; /* Largura fixa para o input de número 'k' */
+}
+
+
 .messages-area {
   flex-grow: 1;
   overflow-y: auto;
-  padding: 20px; /* Ajustado padding */
+  padding: 20px; 
   display: flex;
   flex-direction: column;
   gap: 8px; 
-  background-color: var(--chat-background-color); /* Garante fundo branco aqui também */
+  background-color: var(--chat-background-color); 
 }
 
+/* ... (Resto dos seus estilos CSS existentes para mensagens, input, upload, etc.) ... */
 .no-messages-placeholder {
   display: flex;
   flex-direction: column;
@@ -369,7 +459,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
 .message-wrapper {
   display: flex;
   flex-direction: column;
-  margin-bottom: 12px; /* Ajustado */
+  margin-bottom: 12px; 
 }
 
 .message-wrapper.user {
@@ -381,13 +471,13 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
 }
 
 .message-bubble {
-  padding: 10px 15px; /* Ajustado */
+  padding: 10px 15px; 
   border-radius: var(--border-radius-bubble);
   max-width: 85%; 
   word-wrap: break-word;
   box-shadow: var(--shadow-sm);
-  line-height: 1.5; /* Ajustado */
-  font-size: 0.95rem; /* Ajustado */
+  line-height: 1.5; 
+  font-size: 0.95rem; 
 }
 
 .message-bubble.thinking {
@@ -406,7 +496,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
 }
 
 .message-text {
-  margin: 0 0 4px 0; /* Ajustado */
+  margin: 0 0 4px 0; 
   white-space: pre-wrap;
 }
 
@@ -433,7 +523,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
 }
 
 .timestamp {
-  font-size: 0.7rem; /* Ajustado */
+  font-size: 0.7rem; 
   display: block; 
 }
 
@@ -447,7 +537,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
 }
 
 .input-area { 
-  padding: 12px 20px; /* Ajustado padding */
+  padding: 12px 20px; 
   background-color: var(--header-footer-background); 
   border-top: 1px solid var(--input-border-color);
   flex-shrink: 0;
@@ -456,15 +546,15 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
 .input-form {
   display: flex;
   align-items: center;
-  gap: 10px; /* Ajustado */
+  gap: 10px; 
 }
 
 .message-input {
   flex-grow: 1;
-  padding: 12px 16px; /* Ajustado */
+  padding: 12px 16px; 
   border: 1px solid var(--input-border-color);
-  border-radius: var(--border-radius-medium); /* Usando medium */
-  font-size: 0.95rem; /* Ajustado */
+  border-radius: var(--border-radius-medium); 
+  font-size: 0.95rem; 
   background-color: var(--chat-background-color); 
   color: var(--text-primary);
   outline: none; 
@@ -475,17 +565,17 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   box-shadow: var(--input-focus-box-shadow);
 }
 .message-input:disabled {
-  /*background-color: #e9ecef;*/
+  background-color: #e9ecef;
   cursor: not-allowed;
 }
 
-.send-button {
+.send-button { 
   background-color: var(--button-primary-color);
-  color: white;
+  color: white; 
   border: none;
   border-radius: 50%; 
-  width: 44px; /* Ajustado */
-  height: 44px; /* Ajustado */
+  width: 44px; 
+  height: 44px; 
   display: flex;
   align-items: center;
   justify-content: center;
@@ -493,6 +583,12 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   transition: background-color 0.2s ease, transform 0.1s ease;
   flex-shrink: 0; 
 }
+.send-button svg { 
+  stroke: white; 
+  width: 20px; 
+  height: 20px; 
+}
+
 
 .send-button:hover:not(:disabled) {
   background-color: var(--button-primary-hover-color);
@@ -504,18 +600,17 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   background-color: #adb5bd;
   cursor: not-allowed;
 }
-
-.send-button svg {
-  width: 20px; /* Ajustado */
-  height: 20px; /* Ajustado */
+.send-button:disabled svg {
+  stroke: #f8f9fa; 
 }
+
 
 .spinner { 
   border: 3px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
   border-top-color: #fff;
-  width: 20px; /* Ajustado */
-  height: 20px; /* Ajustado */
+  width: 20px; 
+  height: 20px; 
   animation: spin 1s ease-in-out infinite;
 }
 
@@ -525,26 +620,25 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   }
 }
 
-/* --- ESTILOS REFINADOS PARA A SEÇÃO DE UPLOAD --- */
 .upload-section {
-  padding: 16px 20px; /* Ajustado padding */
+  padding: 16px 20px; 
   border-top: 1px solid var(--input-border-color);
-  background-color: var(--header-footer-background); /* Mesmo fundo do header e input chat */
+  background-color: var(--header-footer-background); 
   flex-shrink: 0;
 }
 
 .upload-section h2 {
-  font-size: 1.05rem; /* Ajustado */
+  font-size: 1.05rem; 
   font-weight: 600;
-  color: var(--text-secondary); /* Cor mais suave para o título da seção */
+  color: var(--text-secondary); 
   margin-top: 0;
-  margin-bottom: 12px; /* Ajustado */
-  text-align: left; /* Alinhado à esquerda para um visual mais de formulário */
+  margin-bottom: 12px; 
+  text-align: left; 
 }
 
 .file-upload-container {
   display: flex;
-  gap: 10px; /* Ajustado */
+  gap: 10px; 
   align-items: center;
 }
 
@@ -557,17 +651,16 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   z-index: -1;
 }
 
-.file-upload-label { /* Botão "Escolher Arquivo" */
+.file-upload-label { 
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px; /* Ajustado */
-  font-size: 0.875rem; /* Ajustado */
+  padding: 8px 14px; 
+  font-size: 0.875rem; 
   font-weight: 500;
-  color: var(--button-secondary-color); /* Usando cor secundária para o botão de escolher */
-  stroke: white;
+  color: var(--button-secondary-color); 
   background-color: var(--chat-background-color);
-  border: 1px solid var(--input-border-color); /* Borda sutil */
+  border: 1px solid var(--input-border-color); 
   border-radius: var(--border-radius-medium);
   cursor: pointer;
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
@@ -575,7 +668,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
 }
 
 .file-upload-label:hover:not(.disabled) {
-  background-color: #6c6e6f; /* Leve hover */
+  background-color: #e9ecef; 
   border-color: #adb5bd;
   color: var(--text-primary);
 }
@@ -588,44 +681,44 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
 .file-upload-label.disabled svg {
   stroke: var(--text-muted);
 }
-.file-upload-label svg {
-    stroke: var(--button-secondary-color); /* Cor do ícone */
+.file-upload-label svg { 
+    stroke: var(--button-secondary-color); 
     transition: stroke 0.2s ease;
 }
 .file-upload-label:hover:not(.disabled) svg {
-    stroke: var(--text-primary);
+    stroke: var(--text-primary); 
 }
 
 
 .file-name-display {
   flex-grow: 1;
-  font-size: 0.875rem; /* Ajustado */
-  color: var(--text-primary); /* Cor primária para o nome do arquivo */
-  background-color: #292e35; /* Fundo sutil para destacar o nome */
-  padding: 8px 12px; /* Ajustado */
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  background-color: #f0f2f5;
+  padding: 8px 12px;
   border-radius: var(--border-radius-medium);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 100px; 
-  border: 1px solid transparent; /* Para manter o alinhamento mesmo sem borda visível */
+  border: 1px solid transparent;
 }
 
 
-.upload-button { /* Botão "Enviar" (para upload) */
-  padding: 8px 16px; /* Ajustado */
-  background-color: var(--button-primary-color); /* Usando cor primária para o botão de ação */
+.upload-button { 
+  padding: 8px 16px; 
+  background-color: var(--button-primary-color); 
   color: white;
   border: none;
   border-radius: var(--border-radius-medium);
-  font-size: 0.875rem; /* Ajustado */
+  font-size: 0.875rem; 
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 90px; /* Ajustado */
+  min-width: 90px; 
   flex-shrink: 0;
 }
 
@@ -633,7 +726,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   background-color: var(--button-primary-hover-color);
 }
 .upload-button:disabled {
-  background-color: #9ca2a8;
+  background-color: #adb5bd;
   cursor: not-allowed;
 }
 
@@ -641,18 +734,18 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   border: 3px solid rgba(255, 255, 255, 0.4);
   border-radius: 50%;
   border-top-color: #fff;
-  width: 16px; /* Ajustado */
-  height: 16px; /* Ajustado */
+  width: 16px; 
+  height: 16px; 
   animation: spin 1s ease-in-out infinite;
   display: inline-block;
 }
 
 .upload-status {
-  margin-top: 10px; /* Ajustado */
-  font-size: 0.8rem; /* Ajustado */
+  margin-top: 10px; 
+  font-size: 0.8rem; 
   text-align: center;
   min-height: 1.2em; 
-  padding: 4px 0; /* Pequeno padding vertical */
+  padding: 4px 0; 
 }
 .upload-status.success {
   color: var(--success-message-text);
@@ -663,6 +756,15 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   font-weight: 500;
 }
 
+.upload-note {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 8px;
+    padding: 0 10px;
+}
+
+
 .messages-area::-webkit-scrollbar {
   width: 8px;
 }
@@ -672,7 +774,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
 .messages-area::-webkit-scrollbar-thumb {
   background-color: #d1d1d1;
   border-radius: 10px;
-  border: 2px solid var(--chat-background-color); /* Usa o fundo do chat para a borda */
+  border: 2px solid var(--chat-background-color); 
 }
 .messages-area::-webkit-scrollbar-thumb:hover {
   background-color: #b3b3b3;

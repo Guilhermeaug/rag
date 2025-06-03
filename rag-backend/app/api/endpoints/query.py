@@ -21,10 +21,15 @@ async def query_documents(request: QueryRequest):
         # pois QueryService.process_query (via load_vectorstore) agora lida com isso
         # e levantará HTTPException se o vectorstore não estiver pronto.
 
-        logger.info(f"Recebida consulta no endpoint: '{request.query}'")
+        logger.info(f"Recebida consulta no endpoint: '{request.query}' com search_type='{request.search_type}' e k={request.search_k}")
         
         # Chama o método process_query do QueryService
-        response_data = await QueryService.process_query(request.query)
+        response_data = await QueryService.process_query(
+            query=request.query,
+            search_type=request.search_type, # Passa o search_type
+            search_k=request.search_k         # Passa o search_k
+            # provider, model, temperature, etc., podem continuar com defaults ou serem adicionados aqui
+        )
         
         # Mapeia a resposta do QueryService para o QueryResponse do endpoint
         # O QueryResponse espera 'query' e 'results'.
