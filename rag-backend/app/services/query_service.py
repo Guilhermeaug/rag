@@ -1,3 +1,4 @@
+from http.client import HTTPException
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.prompts import PromptTemplate
@@ -17,6 +18,33 @@ logger = get_logger(__name__)
 
 
 class QueryService:
+    @staticmethod
+    def load_vectorstore() -> Tuple[Any, Any]: # Defina Any para os tipos de vectorstore e retriever
+        """
+        Carrega (ou obtém) o vectorstore e o retriever do VectorstoreService.
+        Este método deve ser chamado ANTES de qualquer tentativa de consulta.
+        O vectorstore é esperado estar inicializado pelo IngestService.
+        """
+        logger.info("Carregando vectorstore e retriever via VectorstoreService...")
+        vectorstore = VectorstoreService.get_vectorstore() # Assumindo que VectorstoreService tem este método
+
+        if not vectorstore:
+            logger.error("Vectorstore não está carregado ou inicializado no VectorstoreService. Execute a ingestão de dados primeiro.")
+            # Levanta uma exceção que o process_query pode capturar e transformar em HTTPException 503
+            raise ValueError("Vectorstore não está carregado. Execute a ingestão de dados primeiro.")
+
+        try:
+            # Configurações padrão para o retriever, ajuste conforme necessário
+            retriever = vectorstore.as_retriever(
+                search_type="similarity",
+                search_kwargs={"k": 5} # Número de documentos a serem recuperados
+            )
+            logger.info("Vectorstore e retriever carregados com sucesso.")
+            return vectorstore, retriever
+        except Exception as e:
+            logger.error(f"Erro ao criar retriever a partir do vectorstore: {e}")
+            raise ValueError(f"Não foi possível criar o retriever: {e}")
+
     @staticmethod
     def initialize_llm(provider: LLMProvider = "openai", model: str = "gpt-4o-mini", **kwargs) -> Any:
         """
@@ -76,69 +104,72 @@ class QueryService:
     @staticmethod
     async def process_query(
             query: str,
-            provider: LLMProvider = "openai",
+            provider: LLMProvider = "openai", # Certifique-se que LLMProvider está definido
             model: str = "gpt-4o-mini",
             temperature: float = 0.7,
             max_tokens: int = 4096
     ) -> Dict[str, Any]:
-        """
-        Processa uma consulta usando o sistema RAG.
-
-        Args:
-            query: Pergunta do usuário
-            provider: Provedor do LLM
-            model: Nome do modelo a ser usado
-            temperature: Temperatura para geração de texto
-            max_tokens: Número máximo de tokens na resposta
-
-        Returns:
-            Dicionário com a resposta e fontes utilizadas
-
-        Raises:
-            Exception: Se ocorrer um erro durante o processamento da consulta
-        """
         try:
             logger.info(f"Processando consulta: '{query}' com modelo {provider}/{model}")
 
-            # Carregar vectorstore e retriever
-            _, retriever = QueryService.load_vectorstore()
+            vectorstore_instance, retriever = QueryService.load_vectorstore()
 
-            # Inicializar LLM
+            # Logar documentos recuperados (MUITO ÚTIL PARA DEBUG)
+            if retriever:
+                logger.info(f"Recuperando documentos relevantes para a query: '{query}'")
+                retrieved_docs = await retriever.aget_relevant_documents(query) # Use aget_ para async
+                logger.info(f"Número de documentos recuperados: {len(retrieved_docs)}")
+                for i, doc in enumerate(retrieved_docs):
+                    logger.debug(f"--- Documento Relevante {i + 1} ---")
+                    logger.debug(f"Fonte: {doc.metadata.get('source_doc', 'Desconhecido')}")
+                    # Logue um trecho do conteúdo para não poluir demais os logs
+                    logger.debug(f"Conteúdo (snippet): {doc.page_content[:250]}...") 
+            else:
+                logger.warning("Retriever não está disponível. A consulta será feita sem contexto de RAG.")
+
+
             llm_kwargs = {
                 "temperature": temperature,
                 "max_tokens": max_tokens
             }
             llm = QueryService.initialize_llm(provider, model, **llm_kwargs)
-
-            # Criar cadeia de QA
             qa_chain = QueryService.create_qa_chain(llm, retriever)
 
-            # Formatar a query
-            formatted_query = f"query: {query}"
+            logger.info("Gerando resposta com qa_chain.ainvoke...")
+            result = await qa_chain.ainvoke({"input": query})
 
-            # Recuperar documentos para depuração
-            retrieved_docs = retriever.get_relevant_documents(formatted_query)
-            for i, doc in enumerate(retrieved_docs):
-                logger.debug(f"--- Documento {i + 1} ---")
-                logger.debug(f"Fonte: {doc.metadata.get('source_doc', 'Desconhecido')}")
-                logger.debug(f"Conteúdo: {doc.page_content}")
+            # ----> LOG CRÍTICO AQUI <----
+            logger.info(f"Resultado COMPLETO da qa_chain.ainvoke: {result}") 
 
-            # Gerar resposta
-            logger.info("Gerando resposta...")
-            result = qa_chain.invoke({"input": formatted_query})
-            logger.info("Resposta gerada com sucesso")
+            logger.info("Resposta (supostamente) gerada com sucesso pela qa_chain.")
 
-            # Extrair fontes
             sources = []
-            for doc in result.get("context", []):
-                source = doc.metadata.get("source_doc", "Desconhecido")
-                if source not in sources:
-                    sources.append(source)
+            if result and result.get("context"): # Adiciona verificação se result existe
+                for doc in result.get("context", []):
+                    source = doc.metadata.get("source_doc", "Desconhecido")
+                    if source not in sources:
+                        sources.append(source)
+
+            # Pega o valor de "answer" do resultado da chain.
+            # Se "answer" não existir ou for None, o default será usado.
+            answer_from_chain = result.get("answer") if result else None # Verifica se result não é None
+
+            if not answer_from_chain:
+                logger.warning(f"A chave 'answer' está faltando ou é nula no resultado da qa_chain. Resultado: {result}")
+                # Define a resposta padrão se não houver resposta da chain.
+                final_answer = "Não foi possível obter uma resposta específica da LLM para esta consulta."
+            else:
+                final_answer = answer_from_chain
 
             return {
-                "answer": result.get("answer", "Não foi possível gerar uma resposta."),
+                "answer": final_answer,
                 "sources": sources
             }
+        except ValueError as ve:
+            logger.error(f"Erro de valor ao processar consulta (ex: vectorstore não carregado): {ve}")
+            raise HTTPException(status_code=503, detail=str(ve))
         except Exception as e:
-            logger.error(f"Erro ao processar consulta: {e}")
+            logger.error(f"Erro ao processar consulta: {e}", exc_info=True) # Adiciona exc_info para traceback completo
+            if not isinstance(e, HTTPException):
+                raise HTTPException(status_code=500, detail=f"Erro interno ao processar consulta: {str(e)}")
             raise
