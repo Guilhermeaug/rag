@@ -223,7 +223,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
             :disabled="isLoading"
           />
           <button type="submit" class="send-button" aria-label="Enviar mensagem" :disabled="isLoading">
-            <svg v-if="!isLoading" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            <svg v-if="!isLoading" xmlns="http://www.w3.org/2000/svg" width="24" height="24" color="white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
             <div v-else class="spinner"></div>
           </button>
         </form>
@@ -233,7 +233,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
         <h2>Adicionar Documento ao RAG</h2>
         <div class="file-upload-container">
           <label for="file-upload-input" class="file-upload-label" :class="{'disabled': isUploading}">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-upload-cloud"><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path><polyline points="16 16 12 12 8 16"></polyline></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-upload-cloud"><polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path><polyline points="16 16 12 12 8 16"></polyline></svg>
             <span>Escolher Arquivo</span>
           </label>
           <input 
@@ -475,7 +475,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   box-shadow: var(--input-focus-box-shadow);
 }
 .message-input:disabled {
-  background-color: #e9ecef;
+  /*background-color: #e9ecef;*/
   cursor: not-allowed;
 }
 
@@ -565,6 +565,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   font-size: 0.875rem; /* Ajustado */
   font-weight: 500;
   color: var(--button-secondary-color); /* Usando cor secundária para o botão de escolher */
+  stroke: white;
   background-color: var(--chat-background-color);
   border: 1px solid var(--input-border-color); /* Borda sutil */
   border-radius: var(--border-radius-medium);
@@ -574,7 +575,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
 }
 
 .file-upload-label:hover:not(.disabled) {
-  background-color: #e9ecef; /* Leve hover */
+  background-color: #6c6e6f; /* Leve hover */
   border-color: #adb5bd;
   color: var(--text-primary);
 }
@@ -632,7 +633,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   background-color: var(--button-primary-hover-color);
 }
 .upload-button:disabled {
-  background-color: #adb5bd;
+  background-color: #9ca2a8;
   cursor: not-allowed;
 }
 
