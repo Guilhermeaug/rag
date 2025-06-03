@@ -673,7 +673,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   color: var(--text-primary);
 }
 .file-upload-label.disabled {
-  background-color: #f8f9fa;
+  background-color: #55585a;
   border-color: var(--input-border-color);
   color: var(--text-muted);
   cursor: not-allowed;
@@ -694,7 +694,7 @@ const acceptedFileTypes = ".pdf,.doc,.docx,.txt,.md,.xls,.xlsx";
   flex-grow: 1;
   font-size: 0.875rem;
   color: var(--text-primary);
-  background-color: #f0f2f5;
+  background-color: #55585a;
   padding: 8px 12px;
   border-radius: var(--border-radius-medium);
   white-space: nowrap;
