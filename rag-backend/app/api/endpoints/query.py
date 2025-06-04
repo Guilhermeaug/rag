@@ -16,7 +16,6 @@ async def query_documents(request: QueryRequest):
     """
     Endpoint para realizar consultas nos documentos indexados.
     """
-    logger.info("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     try:
         # A verificação explícita de QueryService.vectorstore não é mais necessária aqui,
         # pois QueryService.process_query (via load_vectorstore) agora lida com isso
