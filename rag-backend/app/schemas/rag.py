@@ -1,12 +1,15 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 class QueryRequest(BaseModel):
     query: str = Field(..., description="Pergunta do usuário em linguagem natural")
-    provider: Optional[str] = Field(default="openai", description="Provedor do modelo de linguagem")
-    model: Optional[str] = Field(default="gpt-4o-mini", description="Nome do modelo de linguagem")
+    provider: Optional[str] = Field(default="google", description="Provedor do modelo de linguagem")
+    model: Optional[str] = Field(default="gemini-2.0-flash", description="Nome do modelo de linguagem")
     temperature: Optional[float] = Field(default=0.7, description="Temperatura para geração de texto (0.0 a 1.0)")
     max_tokens: Optional[int] = Field(default=4096, description="Número máximo de tokens na resposta")
+
+    search_type: Optional[Literal['similarity', 'mmr', 'similarity_score_threshold']] = Field(default='similarity', description="Tipo de busca para o retriever")
+    search_k: Optional[int] = Field(default=5, ge=1, le=20, description="Número de documentos a serem recuperados (k)")
 
 class IngestRequest(BaseModel):
     data_dir: Optional[str] = Field(default="data/", description="Diretório onde estão os documentos")
